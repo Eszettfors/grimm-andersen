@@ -1,0 +1,5 @@
+"","author","length","flesch_kincaid","MSTTR","hapax","lex_D","log_ficht_c","valence","arousal","dominance"
+"HC Anderson","HC Anderson","2023","8.9","0.69","57.07","0.47","4.26","5.87","4.05","5.64"
+"Grimm Brothers","Grimm Brothers","1268","7.59","0.67","54.78","0.46","4.36","5.79","4.1","5.6"
+"p-value",NA,"p<0.01","p<0.001","p<0.001","p<0.01","p<0.001","p<0.001","p<0.001","p<0.001","p<0.001"
+"Effect Size(Cohen's D)",NA,NA,"0.76, Medium","0.58, Medium","0.34, Small","0.45, Small","0.45, Small","0.51, Medium","-0.38, Medium","0.29, Small"
