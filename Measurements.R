@@ -382,27 +382,3 @@ View(df_hca)
 
 write.xlsx(df_hca, "~/Documents/Programming/R/Research Corpora/Project/output/hca_measures.xlsx", rowNames = FALSE)
 write.xlsx(df_grimm, "~/Documents/Programming/R/Research Corpora/Project/output/grimm_measures.xlsx", rowNames = FALSE)
-
-
-Desc(df_hca$valence)
-Desc(df_grimm$valence)
-
-shapiro.test((df_hca$valence))
-shapiro.test(df_grimm$valence)
-wilcox.test(df_hca$valence, df_grimm$valence)
-
-CohenD(df_hca$valence, df_grimm$valence)
-wilcox.test(df_hca$valence)
-
-Desc(df_hca$dominance)
-Desc(df_grimm$dominance)
-
-wilcox.test(df_hca$valence, df_grimm$valence)
-
-shapiro.test(df_hca$dominance)
-shapiro.test(df_grimm$dominance)
-
-wilcox.test(df_hca$dominance, df_grimm$valence)
-CohenD(df_hca$dominance, df_grimm$dominance)
-
-
