@@ -1,7 +1,7 @@
 import pandas as pd
 import requests
 
-df = pd.read_excel("Corpus_grimm.xlsx") # can be changed to any excel file of choice, make sure the file contains a column with the same length as the number of texts to be scraped.
+df = pd.read_excel("Corpus_grimm.xlsx") 
 
 def create_indexes(x):
     """
