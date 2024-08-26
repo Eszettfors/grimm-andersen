@@ -14,22 +14,15 @@ data = []
 for link in links:
     href = link.get('href')
     if href and href.endswith('.html'):
-        # Construct the full URL of the book
         book_url = main_url + href
-
-        # Send a request to the book URL
         book_response = requests.get(book_url)
         book_response.raise_for_status()
+        book_soup = BeautifulSoup(book_response.content, 'html.parser') #parse the links
+        
+        title = book_soup.title.string if book_soup.title else "No Title" # access title
 
-        # Parse the book page HTML content
-        book_soup = BeautifulSoup(book_response.content, 'html.parser')
-
-        # Extract the title of the book
-        title = book_soup.title.string if book_soup.title else "No Title"
-
-        # Extract the text content of the book
         paragraphs = book_soup.find_all('p')
-        text = "\n".join(paragraph.get_text() for paragraph in paragraphs)
+        text = "\n".join(paragraph.get_text() for paragraph in paragraphs) #extract texts
         data.append({
             'title': title,
             'text': text
