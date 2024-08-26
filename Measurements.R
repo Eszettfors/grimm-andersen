@@ -15,10 +15,9 @@ library(visreg)
 library(moments)
 library(openxlsx)
 
-
 ######## reading grimm
-df_grimm = read_excel("Documents/Programming/R/Research Corpora/Project/data/Corpus_grimm_with_text.xlsx")
-
+inputpath = paste(getwd(), "/data", sep = "")
+df_grimm = read.xlsx(paste(inputpath, "/Corpus_grimm_with_text.xlsx", sep=""))
 
 text = c()
 i = 1
@@ -35,8 +34,8 @@ docvars(grimm_corpus, 'author') = 'Grimm'
 df_grimm = summary(grimm_corpus, n=Inf)
 
 ##### reading Andersen
-
-df_hca = read_excel("Documents/Programming/R/Research Corpora/Project/data/Corpus_HCA.xlsx")
+df_hca = read.xlsx(paste(inputpath, "/Corpus_HCA.xlsx", sep=""))
+#df_hca = read_excel("Documents/Programming/R/Research Corpora/Project/data/Corpus_HCA.xlsx")
 
 text = c()
 i = 1
@@ -52,62 +51,20 @@ docvars(hca_corpus, 'author') = 'HC Andersen'
 
 df_hca = summary(hca_corpus, n=Inf)
 
-
 ### descriptive analysis of the corpuses
 
 length(df_hca$Text) #142
 length(df_grimm$Text) #209
 
-par(mfrow = c(1,1))
-
-sum_hca <- sum(df_hca$Tokens)
-sum_grimm <- sum(df_grimm$Tokens)
+sum_hca = sum(df_hca$Tokens)
+sum_grimm = sum(df_grimm$Tokens)
 
 sum(df_hca$Tokens)        
 sum(df_grimm$Tokens)   
 
-#grimm corpus is quite larger than the andersen corpus/more texts -> normalized TTR required
+#difference in size of corpuses -> normalized TTR required
 
-
-## Checking distribution
-
-par(mfrow = c(1,2))
-
-hist_hca = hist(df_hca$Tokens, col = 'lightblue', main = 'Distribution of tokens in Andersen stories', xlab = 'Tokens')
-
-#left skew, tendency towards uniform distribution
-
-hist_grimm = hist(df_grimm$Tokens, col = 'pink', main = 'Distribution of tokens in Grimm stories', xlab = 'Tokens')
-
-#heavy left skew falling -> similar to poisson distribution
-
-box_hca = boxplot(df_hca$Tokens, col = 'lightblue', main = 'Boxplot of tokens in Andersen stories', ylab = 'Tokens')
-print(box_hca)
-
-box_grimm = boxplot(df_grimm$Tokens, col = 'pink', main = 'Boxplot of tokens in Grimm stories', ylab = 'Tokens')
-print(box_grimm)
-#existing outliers -> check and remove
-
-box_grimm$out
-#df_grimm[df_grimm$Tokens >= min(box_grimm$out),]
-#no especially important works -> okay to remove
-#df_grimm = df_grimm[df_grimm$Tokens < min(box_grimm$out),]
-
-Desc(df_hca$Tokens, main='Descriptive plots of tokens in Andersen') #mean = 2743, 95CI = 2426 - 3056; median = 2023, skew = 0.95
-
-Desc(df_grimm$Tokens, main='Descriptive plots of tokens in Grimm')#mean = 1484 95CI = 1338 - 1630; median = 1261; skew = 0.82
-dev.off(dev.list()["RStudioGD"]) #clears plot window
-
-#As transforming the data would effect interpretablility negatively, non parametric test of significance
-# is used: Mann-Whitney U test
-
-test = wilcox.test(df_grimm$Tokens, df_hca$Tokens)
-print(test) #p>0.001 -> highly significant difference in average token length
-
-# Conclusion: The stories of HC Andersen are on average longer than those of the Grimm brothers
-
-### generating complexity measurement:
-
+### generating complexity measurements:
 #readability
 read_fk = function(corpus){
    i = 1
@@ -143,59 +100,10 @@ MSTTR = function(corpus){
 hca_corpus = MSTTR(hca_corpus)
 grimm_corpus = MSTTR(grimm_corpus)
 
-
 df_hca = summary(hca_corpus, n=Inf)
 df_grimm = summary(grimm_corpus, n=Inf)
 
-##analysing Readability
-Desc(df_hca$flesch_kincaid, main = 'Flesch-kincaid scores of Andersen texts') # mean 8.996, 95 CI = 8.643-9.151; skew = 0.34
-shapiro.test(df_hca$flesch_kincaid)# -> not normally distributed p>0.2
-
-Desc(df_grimm$flesch_kincaid, main = 'Flesch-kincaid scores of Grimm texts') # mean 7.595, 95 CI = 7.63-9.151; skew = -0.07
-shapiro.test(df_grimm$flesch_kincaid) #normal distribution: p<0.01
-
-#Transforming hca readability. 
-squared_hca = df_hca$flesch_kincaid^2
-shapiro.test(squared_hca) #p < 0.01
-skewness(squared_hca)#skew = 0.77
-
-root_hca = sqrt(df_hca$flesch_kincaid)
-shapiro.test(root_hca) #p = 0.74 -> not normal
-skewness(root_hca) #skew = 0.12
-#squaring gives normal distribution
-
-#comparing difference in mean
-squared_grimm = (df_grimm$flesch_kincaid)^2
-shapiro.test(squared_grimm) #normal distribution
-
-test = t.test(squared_hca, squared_grimm)
-print(test) #p>0.001 Highly significant
-
-#conclusion:The grimm stories are on average at the readability level of a 7-8 grader,
-#while the HC Andersen stories on average at the readability level of a 8-9,
-#meaning that the stories of HC Anderson are more difficult to read than the Grimm ones
-
-
-##Analysing lexical diversity
-Desc(df_hca$MSTTR, main = 'MSTTR for Andersen texts') # mean 0.690, 95 CI = 0.689-0.694; skew = -0.81
-shapiro.test(df_hca$MSTTR)# -> normally distributed -> p<0.001
-
-Desc(df_grimm$MSTTR, main = 'MSTTR for Grimm texts') # mean 0.669, 95 CI = 0.662-0.675; skew = -3.83
-shapiro.test(df_grimm$MSTTR) #normal distribution: p<0.001
-
-
-test = t.test(df_hca$MSTTR, df_grimm$MSTTR) #p<0.001
-
-CohenD(df_hca$MSTTR, df_grimm$MSTTR)#D = 0.58 -> Medium Effect
-
-#conclusion: There is a significant difference in lexical diversity, with the stories of HCA being more diverse. 
-#The size of the effect is medium.
-
-
-
 #### Tagging the corpus
-
-
 spacy_download_langmodel(lang_models = "en_core_web_sm", force = TRUE)
 spacy_initialize("en_core_web_sm")
 
@@ -331,20 +239,18 @@ df_grimm$ficht_c = ficht
 
 
 #### sentiment analysis
-sents = read.table('~/Documents/Programming/R/Research Corpora/Project/data/UK_sentiment.txt', sep = "\t", quote = "", stringsAsFactors = FALSE, header = TRUE)
+read.xlsx(paste(inputpath, "/Corpus_grimm_with_text.xlsx", sep=""))
+sents = read.table(paste(inputpath, "/UK_sent.txt", sep = ""), sep = "\t", quote = "", stringsAsFactors = FALSE, header = TRUE)
 sents = sents[,-1]
 
 ## remove stop words
-stop_eng <- stopwords()
-hca_tagged_reduced<- hca_tagged_reduced[-which(hca_tagged_reduced$lemma %in% stop_eng),]
-grimm_tagged_reduced<- grimm_tagged_reduced[-which(grimm_tagged_reduced$lemma %in% stop_eng),]
+stop_eng = stopwords()
+hca_tagged_reduced = hca_tagged_reduced[-which(hca_tagged_reduced$lemma %in% stop_eng),]
+grimm_tagged_reduced = grimm_tagged_reduced[-which(grimm_tagged_reduced$lemma %in% stop_eng),]
 
 #merge with sent-values
 hca_sent = merge(hca_tagged_reduced, sents, by.x = "lemma", by.y = "Word")
 grimm_sent = merge(grimm_tagged_reduced, sents, by.x = "lemma", by.y = "Word")
-
-
-
 
 avg_valence = c()
 avg_arousal = c()
@@ -378,7 +284,8 @@ df_grimm$arousal = avg_arousal
 df_grimm$dominance = avg_dominance
 View(df_grimm)
 View(df_hca)
-#export data
 
-write.xlsx(df_hca, "~/Documents/Programming/R/Research Corpora/Project/output/hca_measures.xlsx", rowNames = FALSE)
-write.xlsx(df_grimm, "~/Documents/Programming/R/Research Corpora/Project/output/grimm_measures.xlsx", rowNames = FALSE)
+#export data
+outputpath = paste(getwd(), "/output", sep = "")
+write.xlsx(df_hca, paste(outputpath, "/hca_measures.xlsx", sep=""), rowNames = FALSE)
+write.xlsx(df_grimm, paste(outputpath, "/grimm_measures.xlsx", sep=""), rowNames = FALSE)
