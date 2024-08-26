@@ -18,14 +18,13 @@ library(ggplot2)
 library(effsize)
 library(gt)
 
-
 inputpath = paste(getwd(), "/output", sep = "")
 df_hca = read.xlsx(paste(inputpath, "/hca_measures.xlsx", sep=""))
 df_grimm = read.xlsx(paste(inputpath, "/grimm_measures.xlsx", sep=""))
 df_bind = rbind(df_hca, df_grimm)
 
 #data frame to hold averages
-df_average = data.frame(row.names = c('HC Anderson', 'Grimm Brothers', 'p-value', "Effect Size(Cohen's D)"))
+df_average = data.frame(row.names = c('Mean/Median*', 'mean/median*', 'p-value', "Cohen's D/Cliff's delta*"))
 df_average$author = c('HC Anderson', 'Grimm Brothers')
 df_average$author[3:4] = NA
 
@@ -47,10 +46,6 @@ ggplot(bar, aes(author,m,fill=author)) +
   geom_errorbar(aes(ymin=m-CI/2, ymax=m+CI/2), width=.2,
                 position=position_dodge(.9))+
                   ylab('Average number of tokens per text')
-
-#conclusion: HC Anderson on average wrote almost twice as long fairy tales as the Grimm brothers.
-# This could be attributed to him being a writer -> creativity, while the grimm brothers were somewhat confined 
-# to existing stories of the folklore
 
 ### Readability
 
@@ -126,7 +121,6 @@ ggplot(bar, aes(author, m, fill = author)) +
                 position = position_dodge(0.9)) +
   ylab('Average percent of hapax legomenon (mean)')
 
-#Conclusion: HC andersen show a small but significant tendency to a more rich language with more hapax legomenon than Grimm
 
 #Lexical diversity
 Desc(df_hca$lex_D)
@@ -179,31 +173,9 @@ ggplot(bar, aes(author, m, fill = author)) +
                 position = position_dodge(0.9)) +
   ylab('Syntactic complexity as the average logarithm of Ficht C (median)')
 
+###analysing sentiment
 
-#Conclusion: The works of the Grimm brother show a higher degree of syntactic complexity
-
-
-#summary of Lexical complexity: On the whole, the works of Anderson shows a higher degree of complexity
-#across the board, as well as generally writing longer words. We theorize that this could be due
-# to Anderson writing his own stories, while the Grimm brothers complied existing stories from the folklore,
-# forcing an on average more simple language. Furthermore, Andersen tried to achieve social critic with his stories
-# which could explain the need for a more complex language as compared to the more descriptive tales of the Grimm Brothers.
-# This could, however, also be caused by a difference in the language of translators. The only way of removing this variable
-# would be to find translations of both works carried out by the same person, but to the extent of our knowledge, this unfortunately does not exist.
-# A factor which has to be argued only can be influenced by the translator to a small degree is however the lenght of the stories,
-# where we found a remarkable difference between the authors. This suggest that the writings are fundamentaly different, which
-# lends less support for the idea that differences observed in linguistic complexity would be caused by the individual language
-# of different translators to a larger extent.
-
-# Apart from this, it is also interesting to note that we observe a high degree of variance among the stories
-# of the respective authors. We hypothezised, that across the board, the language of fairly tales would be
-# rather simple, which we also observe, but some fairy tales are very complex, with a flesch-kincaid score as high as 13-14,
-# and also very simple, as low as 2-3. Perhaps this richness and diversity which we find in the works of both these authors
-# have contributed to their immense success, setting a permanent mark on the literary history and present of Europe.
-
-
-#analysing sentiment
-
+##valence
 Desc(df_hca$valence)
 Desc(df_grimm$valence)
 
@@ -225,8 +197,7 @@ ggplot(bar, aes(author, m, fill = author)) +
                 position = position_dodge(0.9)) +
   ylab('Mean valence score')
 
-# Conclusion: HC andersen stories are more positive than Grimm the grimm stories
-
+## Arousal
 Desc(df_hca$arousal)
 Desc(df_grimm$arousal)
 
@@ -250,6 +221,7 @@ ggplot(bar, aes(author, m, fill = author)) +
                 position = position_dodge(0.9)) +
   ylab('average arousal score (median)')
 
+## Dominance
 Desc(df_hca$dominance)
 Desc(df_grimm$dominance)
 
@@ -278,9 +250,10 @@ ggplot(bar, aes(author, m, fill = author)) +
 outputpath = paste(getwd(), "/output", sep = "")
 write.csv(df_average, paste(outputpath, '/average_measures_combined.csv', sep = ""), row.names = TRUE, quote = TRUE)
 
-#create a table
-
-colnames(df_average) = c("Author", "Length*", "Flesch-Kincaid", "MSTTR", "Hapax", "Lexical Density", "Ficht C (log)", "Valence", "Arousal*", "Dominance*" )
+##create a table
+df_average = df_average %>%
+  rownames_to_column(var = " ")
+colnames(df_average) = c(" ", "Author", "Length*", "Flesch-Kincaid", "MSTTR", "Hapax", "Lexical Density", "Ficht C (log)", "Valence", "Arousal*", "Dominance*" )
 
 gt(df_average) %>%
   tab_header(title = "Average Scores Table") %>%
@@ -291,5 +264,6 @@ gt(df_average) %>%
     ),
     locations = cells_column_labels()
   )
+
 
 
