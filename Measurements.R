@@ -35,7 +35,6 @@ df_grimm = summary(grimm_corpus, n=Inf)
 
 ##### reading Andersen
 df_hca = read.xlsx(paste(inputpath, "/Corpus_HCA.xlsx", sep=""))
-#df_hca = read_excel("Documents/Programming/R/Research Corpora/Project/data/Corpus_HCA.xlsx")
 
 text = c()
 i = 1
@@ -81,7 +80,7 @@ hca_corpus = read_fk(hca_corpus)
 grimm_corpus = read_fk(grimm_corpus)
 
 #Lexical diversity
-#as the stories all have different length, a normalized type token ration is used. MSTTR has shown it self suitable
+#as the stories all have different length, a normalized type token ratio is used. MSTTR has shown it self suitable
 # independent of text length and is easy to interpret
 #https://core.ac.uk/download/pdf/82620241.pdf
 MSTTR = function(corpus){
@@ -239,7 +238,6 @@ df_grimm$ficht_c = ficht
 
 
 #### sentiment analysis
-read.xlsx(paste(inputpath, "/Corpus_grimm_with_text.xlsx", sep=""))
 sents = read.table(paste(inputpath, "/UK_sent.txt", sep = ""), sep = "\t", quote = "", stringsAsFactors = FALSE, header = TRUE)
 sents = sents[,-1]
 
