@@ -402,8 +402,3 @@ ggplot(data = df_rvi,
 
 
 stargazer(author_mdl, author_mdl_2, author_mdl_3,title = "comparison of base models", column.labels = c("Full model",  "Without Fichtner's C", "without Flesch Kincaid"),  out = "glm_output.tex", type = "latex")
-
-
-
-sent_mod = glm(data = z_model, author ~ valence * arousal * dominance ,family = binomial(link = "logit"))
-summary(sent_mod)
