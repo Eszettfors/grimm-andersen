@@ -238,17 +238,19 @@ df_grimm$ficht_c = ficht
 
 
 #### sentiment analysis
-sents = read.table(paste(inputpath, "/UK_sent.txt", sep = ""), sep = "\t", quote = "", stringsAsFactors = FALSE, header = TRUE)
-sents = sents[,-1]
+sents = read.table(paste(inputpath, "/NRC-VAD-Lexicon.txt", sep = ""), sep = "\t", quote = "", stringsAsFactors = FALSE, header = FALSE)
+colnames(sents) = c("word", 'valence', 'arousal', 'dominance')
 
-## remove stop words
+## remove stop words and unify token by lowercase
 stop_eng = stopwords()
 hca_tagged_reduced = hca_tagged_reduced[-which(hca_tagged_reduced$lemma %in% stop_eng),]
 grimm_tagged_reduced = grimm_tagged_reduced[-which(grimm_tagged_reduced$lemma %in% stop_eng),]
+grimm_tagged_reduced$token = tolower(grimm_tagged_reduced$token)
+hca_tagged_reduced$token = tolower(hca_tagged_reduced$token)
 
 #merge with sent-values
-hca_sent = merge(hca_tagged_reduced, sents, by.x = "lemma", by.y = "Word")
-grimm_sent = merge(grimm_tagged_reduced, sents, by.x = "lemma", by.y = "Word")
+hca_sent = merge(hca_tagged_reduced, sents, by.x = "token", by.y = "word")
+grimm_sent = merge(grimm_tagged_reduced, sents, by.x = "token", by.y = "word")
 
 avg_valence = c()
 avg_arousal = c()
@@ -257,9 +259,9 @@ i = 0
 for (i in 1:length(df_hca$Text)){
   text = paste('text', i,sep = "")
   hca_sent_text = hca_sent[which(hca_sent$doc_id == text),]
-  avg_valence = c(avg_valence, sum(hca_sent_text$Valence)/length(hca_sent_text$Valence))
-  avg_arousal = c(avg_arousal, sum(hca_sent_text$Arousal)/length(hca_sent_text$Arousal))
-  avg_dominance = c(avg_dominance, sum(hca_sent_text$Dominance)/length(hca_sent_text$Dominance))
+  avg_valence = c(avg_valence, sum(hca_sent_text$valence)/length(hca_sent_text$valence))
+  avg_arousal = c(avg_arousal, sum(hca_sent_text$arousal)/length(hca_sent_text$arousal))
+  avg_dominance = c(avg_dominance, sum(hca_sent_text$dominance)/length(hca_sent_text$dominance))
 }
 
 df_hca$valence = avg_valence
@@ -273,17 +275,28 @@ i = 0
 for (i in 1:length(df_grimm$Text)){
   text = paste('text', i,sep = "")
   grimm_sent_text = grimm_sent[which(grimm_sent$doc_id == text),]
-  avg_valence = c(avg_valence, sum(grimm_sent_text$Valence)/length(grimm_sent_text$Valence))
-  avg_arousal = c(avg_arousal, sum(grimm_sent_text$Arousal)/length(grimm_sent_text$Arousal))
-  avg_dominance = c(avg_dominance, sum(grimm_sent_text$Dominance)/length(grimm_sent_text$Dominance))
+  avg_valence = c(avg_valence, sum(grimm_sent_text$valence)/length(grimm_sent_text$valence))
+  avg_arousal = c(avg_arousal, sum(grimm_sent_text$arousal)/length(grimm_sent_text$arousal))
+  avg_dominance = c(avg_dominance, sum(grimm_sent_text$dominance)/length(grimm_sent_text$dominance))
 }
 df_grimm$valence = avg_valence
 df_grimm$arousal = avg_arousal
 df_grimm$dominance = avg_dominance
-View(df_grimm)
-View(df_hca)
+
 
 #export data
 outputpath = paste(getwd(), "/output", sep = "")
 write.xlsx(df_hca, paste(outputpath, "/hca_measures.xlsx", sep=""), rowNames = FALSE)
 write.xlsx(df_grimm, paste(outputpath, "/grimm_measures.xlsx", sep=""), rowNames = FALSE)
+
+sents_nums = subset(sents, select = -c(Word))
+cm1 = cor(sents_nums)
+corrplot(cm1)
+
+
+VAD_lexicon = read.table(paste(inputpath, "/NRC-VAD-Lexicon.txt", sep = ""), sep = "\t", quote = "", stringsAsFactors = FALSE, header = FALSE)
+View(VAD_lexicon)
+colnames(VAD_lexicon) = c("word", "valence", "arousal", 'dominance')
+vad_nums = subset(VAD_lexicon, select = -c(word))
+cm2 = cor(vad_nums)
+corrplot(cm2)
