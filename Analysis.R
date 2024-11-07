@@ -27,7 +27,7 @@ library(stargazer)
 library(rgl)
 library(scatterplot3d)
 library(plotly)
-
+library(htmlwidgets)
 
 inputpath = paste(getwd(), "/output", sep = "")
 df_hca = read.xlsx(paste(inputpath, "/hca_measures.xlsx", sep=""))
@@ -328,9 +328,20 @@ nums_box + labs(title = 'Distribution of z-transformed Measures by Author as Box
 
 
 
+
+
 # scatterplots
 
-plot_ly(df_bind, 
+grimm_stories = read.xlsx("data/Corpus_grimm_with_text.xlsx")
+andersen_stories = read.xlsx("data/Corpus_HCA.xlsx")
+
+grimm_stories$text = gsub("\n", " ", grimm_stories$text)
+andersen_stories$text = gsub("\n", " ", andersen_stories$text)
+
+stories_bind = rbind(grimm_stories, andersen_stories)
+df_plot = merge(df_bind, stories_bind, by = "title")
+
+fig = plot_ly(df_plot, 
         x = ~valence, 
         y = ~arousal, 
         z = ~dominance,
@@ -338,14 +349,54 @@ plot_ly(df_bind,
         type = "scatter3d", 
         mode = "markers",
         marker = list(size = 5),
-        text = ~paste("Valence:", valence, 
-                      "<br>Arousal:", arousal, 
-                      "<br>Dominance:", dominance, 
+        text = ~paste("Valence:", round(valence,3), 
+                      "<br>Arousal:", round(arousal,3), 
+                      "<br>Dominance:", round(dominance,3), 
                       "<br>Author:", author, 
-                      "<br>Title:", df_bind$title),  # Custom hover text
+                      "<br>Title:", df_plot$title),  # Custom hover text
+        customdata = df_plot$text,
         hoverinfo = "text")  # Display hover text only
 
+fig <- fig %>% htmlwidgets::onRender("
+  function(el, x) {
+  
+    var modal = document.createElement('div');
+    modal.style.display = 'none';
+    modal.style.position = 'fixed';
+    modal.style.zIndex = '1000';
+    modal.style.left = '50%';
+    modal.style.top = '50%';
+    modal.style.transform = 'translate(-50%, -50%)';
+    modal.style.backgroundColor = '#fff';
+    modal.style.padding = '20px';
+    modal.style.border = '1px solid #888';
+    modal.style.borderRadius = '8px';
+    modal.style.boxShadow = '0px 0px 10px rgba(0, 0, 0, 0.2)';
 
+    var closeButton = document.createElement('button');
+    closeButton.innerText = 'Close';
+    closeButton.style.marginTop = '10px';
+    closeButton.onclick = function() {
+      modal.style.display = 'none';
+    };
+
+    var content = document.createElement('p');
+    modal.appendChild(content);
+    modal.appendChild(closeButton);
+    document.body.appendChild(modal);
+
+    el.on('plotly_click', function(data) {
+      var storyText = data.points[0].customdata;
+      content.innerText = storyText;
+      modal.style.display = 'block';
+    });
+  }
+")
+
+saveWidget(fig, "3d_scatterplot.html", selfcontained = TRUE)
+
+andersen_stories = read.xlsx("data/Corpus_grimm_with_text.xlsx")
+grimm_stories = read.xlsx
 
 #### modelling
 
@@ -372,16 +423,29 @@ stargazer(author_mdl, out = "aut_mdl_output.tex", type = "latex")
 
 z_model_2 = subset(z_model, select = -c(ficht_c))
 author_mdl_2 = glm(data = z_model_2, author ~ ., family = binomial(link = "logit") )
-summary(author_mdl_2)
+summary(author_mdl_2) #AIC worse
 
 z_model_3 = subset(z_model, select = -c(flesch_kincaid))
 author_mdl_3 = glm(data = z_model_3, author ~ ., family = binomial(link = "logit") )
-summary(author_mdl_3)
+summary(author_mdl_3) #AIC worse
 
 author_mdl_4 = glm(data = z_model, author ~ . + arousal:dominance + valence:dominance + valence:arousal, family = binomial(link = "logit") )
 summary(author_mdl_4)
-plot_coefs(author_mdl_4) + labs(title = "Coefficients for Infering Authorship") + theme_apa()
+plot_coefs(author_mdl_4) + labs(title = "Coefficients for Infering Authorship, Best model") + theme_apa()
 
+VAD_mdl = glm(data = z_model, author ~ valence * dominance * arousal, family = binomial(link = "logit") )
+summary(VAD_mdl)
+plot_coefs(VAD_mdl) + labs(title = "Coefficients for Infering Authorship, sentiment") + theme_apa()
+sum = summary(VAD_mdl)
+vad_coefs = as.data.frame(sum$coefficients)
+vad_coefs$Estimate
+colnames(vad_coefs) = c("Estimate", "Error", "z", "p")
+vad_coefs = vad_coefs %>% mutate(OR = exp(Estimate), significance = case_when(p < 0.05 ~"significant", p > 0.05 ~ "not significant"))
+vad_coefs = vad_coefs[-1, ]
+vad_coefs$variable = rownames(vad_coefs)
+ggplot(data = vad_coefs,
+       map = aes(y = OR, x = variable, fill = significance, color = significance)) + geom_bar(stat = 'identity') + 
+       labs(title = "Relative increase in odds of HC anderson being author per standard deviation increase in sentiment") + geom_hline(yintercept = 1, linetype = "dashed")
 
 options(na.action = 'na.fail')
 dd = dredge(author_mdl, rank = "AICc")
@@ -400,5 +464,5 @@ df_rvi$vars = factor(vars, levels = vars)
 ggplot(data = df_rvi,
        map = aes(y = rvi, x = vars)) + geom_bar(stat = 'identity', col = 'darkmagenta', fill = 'darkmagenta') + labs(title = "Relative Variable Importance for Inferring Authorship", x = 'Variables', y = 'Relative Variable Importance') + theme_apa()
 
+stargazer(author_mdl, author_mdl_2, author_mdl_3, author_mdl_4,title = "comparison of models", column.labels = c("Full Model",  "Without Fichtner's C", "Without Flesch Kincaid", "Best Model", "VAD Model"),  out = "glm_output.tex", type = "latex")
 
-stargazer(author_mdl, author_mdl_2, author_mdl_3,title = "comparison of base models", column.labels = c("Full model",  "Without Fichtner's C", "without Flesch Kincaid"),  out = "glm_output.tex", type = "latex")
