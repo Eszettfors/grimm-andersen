@@ -279,23 +279,23 @@ gt(df_average) %>%
 
 avrgs = df_bind %>% group_by(author) %>% summarise(
   length = median(Tokens)/10000,
-  flesch_kincaid = mean(flesch_kincaid)/10, 
-  MSTTR = mean(MSTTR),
-  hapax = mean(hapax)/100,
-  lex_D = mean(lex_D),
-  log_ficht_c = median(log(ficht_c))/10,
-  valence = mean(valence),
-  arousal = mean(arousal),
-  dominance = mean(dominance)
+  flesch_kincaid = median(flesch_kincaid)/10, 
+  MSTTR = median(MSTTR),
+  hapax = median(hapax)/100,
+  lex_D = median(lex_D),
+  ficht_c = median(ficht_c)/100,
+  valence = median(valence),
+  arousal = median(arousal),
+  dominance = median(dominance)
 )
 
 # barplots
-avrg_longer = avrgs %>% pivot_longer(cols = c('length','flesch_kincaid', 'MSTTR', 'hapax', 'lex_D','log_ficht_c', 'valence', 'arousal', 'dominance'), names_to = "measure", values_to = 'averages') 
-avrg_longer$measure = factor(avrg_longer$measure, levels = c('length','flesch_kincaid', 'MSTTR', 'hapax', 'lex_D','log_ficht_c', 'valence', 'arousal', 'dominance'))
+avrg_longer = avrgs %>% pivot_longer(cols = c('length','flesch_kincaid', 'MSTTR', 'hapax', 'lex_D','ficht_c', 'valence', 'arousal', 'dominance'), names_to = "measure", values_to = 'averages') 
+avrg_longer$measure = factor(avrg_longer$measure, levels = c('length','flesch_kincaid', 'MSTTR', 'hapax', 'lex_D','ficht_c', 'valence', 'arousal', 'dominance'))
 
 avrg_plot = ggplot(data = avrg_longer,
                    map = aes(y = averages,x = measure, fill = author, color = author)) + geom_bar(position = 'dodge', stat = 'identity')
-avrg_plot + labs(title = 'Comparison of average measurements between authors rescaled', y = 'averages', x = 'measures') + scale_x_discrete(labels = c('Length*', 'Flesch Kincaid','MSTTR' ,'Hapax', 'Lexical Density',"Log Fichtner's C*", 'Valence', 'Arousal', 'Dominance')) + theme_apa()
+avrg_plot + labs(title = 'Comparison of average measurements between authors rescaled', y = 'averages', x = 'measures') + scale_x_discrete(labels = c('Length', 'Flesch Kincaid','MSTTR' ,'Hapax', 'Lexical Density',"Fichtner's C", 'Valence', 'Arousal', 'Dominance')) + theme_apa()
 
 
 #boxplots
@@ -326,12 +326,13 @@ nums_box = ggplot(data = nums_long,
                   map = aes(x = measures, y = values, fill = author, color = author)) + geom_boxplot(position = 'dodge', color = "black")
 nums_box + labs(title = 'Distribution of z-transformed Measures by Author as Boxplots', y = 'Values', x = 'Measures') + scale_x_discrete(labels = c('Length', 'Flesch Kincaid','MSTTR' ,'Hapax', 'Lexical Density',"Fichtner's C", 'Valence', 'Arousal', 'Dominance')) + theme_apa()
 
-
-
+nums_box
+#heavy outlier in grimm MSTTR -> domestic servant ,  repeats the sentences over and over
+# remove from analysis
+df_bind = df_bind %>% filter(title != "Domestic Servants")
 
 
 # scatterplots
-
 grimm_stories = read.xlsx("data/Corpus_grimm_with_text.xlsx")
 andersen_stories = read.xlsx("data/Corpus_HCA.xlsx")
 
@@ -381,6 +382,12 @@ fig <- fig %>% htmlwidgets::onRender("
     };
 
     var content = document.createElement('p');
+    var content = document.createElement('div');  // Changed from <p> to <div> to allow scrolling
+    content.style.maxHeight = '300px';  // Set max height to make it scrollable
+    content.style.overflowY = 'auto';   // Enable vertical scrolling if content exceeds max height
+    content.style.marginBottom = '10px'; // Add space between text and close button
+    
+    
     modal.appendChild(content);
     modal.appendChild(closeButton);
     document.body.appendChild(modal);
@@ -395,13 +402,18 @@ fig <- fig %>% htmlwidgets::onRender("
 
 saveWidget(fig, "3d_scatterplot.html", selfcontained = TRUE)
 
-andersen_stories = read.xlsx("data/Corpus_grimm_with_text.xlsx")
-grimm_stories = read.xlsx
+
 
 #### modelling
+#inferential modelling
 
-model = subset(df_bind, select = -c(Text, title, Types, Tokens, Sentences, grm_D))
+model = subset(df_bind, select = -c(Text, title, Types, Sentences, grm_D))
+
+
 model$author = as.factor(model$author)
+levels(model$author) = c("HC Andersen", "Grimm")
+colnames(model)[1] = "length"
+model = model %>% 
 attach(model)
 
 nums_cols = sapply(model, is.numeric)
@@ -413,26 +425,50 @@ z_model = as.data.frame(z_model[,])
 cm = cor(model[,nums_cols])
 corrplot(cm)
 cor.mtest(cm)
-cor.test(flesch_kincaid, ficht_c)
+cor.test(flesch_kincaid, ficht_c)# high correlation -> check VIF
 
 z_model$author = author
 author_mdl = glm(data = z_model, author ~ ., family = binomial(link = "logit") )
-summary(author_mdl)
+summary(author_mdl)#AIC = 134.66
 plot_coefs(author_mdl) + labs(title = "Coefficients for Infering Authorship, full model") + theme_apa()
-stargazer(author_mdl, out = "aut_mdl_output.tex", type = "latex")
+stargazer(author_mdl, out = "aut_mdl_output.tex", type = "latex") 
+VIF(author_mdl) #flesch kincaid and ficht_C have high VIF
 
 z_model_2 = subset(z_model, select = -c(ficht_c))
 author_mdl_2 = glm(data = z_model_2, author ~ ., family = binomial(link = "logit") )
-summary(author_mdl_2) #AIC worse
+summary(author_mdl_2) #AIC = 290
+plot_coefs(author_mdl_2)
+VIF(author_mdl_2) 
 
 z_model_3 = subset(z_model, select = -c(flesch_kincaid))
 author_mdl_3 = glm(data = z_model_3, author ~ ., family = binomial(link = "logit") )
-summary(author_mdl_3) #AIC worse
+summary(author_mdl_3) #AIC 288.19
+plot_coefs(author_mdl_3)+ labs(title = "Coefficients for Infering Authorship, third model") + theme_apa()
+VIF(author_mdl_3)
+#removing flesch-kincaid C has better AIC -> chosen to keep
 
-author_mdl_4 = glm(data = z_model, author ~ . + arousal:dominance + valence:dominance + valence:arousal, family = binomial(link = "logit") )
-summary(author_mdl_4)
-plot_coefs(author_mdl_4) + labs(title = "Coefficients for Infering Authorship, Best model") + theme_apa()
+#adding interaction terms for sentiment
+author_mdl_4 = glm(data = z_model_3, author ~ . + arousal:dominance + valence:dominance + valence:arousal, family = binomial(link = "logit") )
+summary(author_mdl_4) #285.91
+plot_coefs(author_mdl_4) + labs(title = "Coefficients for Infering Authorship, Best model") + 
+  scale_y_discrete(labels = c('Length','MSTTR' ,'Hapax', 'Lexical Density',"Fichtner's C", 'Valence', 'Arousal', 'Dominance', 'Arousal:Dominance', 'Valence:Dominance', 'Valence:Arousal')) + 
+                     theme_apa()
 
+
+#plotting best model
+sum = summary(author_mdl_4)
+coefs = as.data.frame(sum$coefficients)
+coefs$Estimate
+colnames(coefs) = c("Estimate", "Error", "z", "p")
+coefs = coefs %>% mutate(OR = exp(Estimate), significance = case_when(p < 0.05 ~"significant", p > 0.05 ~ "not significant"))
+coefs = coefs[-1, ]
+coefs$variable = rownames(coefs)
+ggplot(data = coefs,
+       map = aes(y = OR, x = variable, fill = significance, color = significance)) + geom_bar(stat = 'identity') + 
+  labs(title = "Relative increase in odds of HC anderson being author per standard deviation increase in sentiment and complexity") + geom_hline(yintercept = 1, linetype = "dashed") + scale_x_discrete(labels = c('Arousal', 'Arousal:Dominance','Dominance',"Fichtner's C", 'Hapax',"Length", 'Lexical Density','MSTTR', 'Valence', 'Valence:Arousal', 'Valence:Dominance')) +theme_apa() +
+  scale_fill_manual(values = c("significant" = "darkgreen", "not significant" = "gray")) + 
+  scale_color_manual(values = c("significant" = "darkgreen", "not significant" = "darkgray")) 
+#
 VAD_mdl = glm(data = z_model, author ~ valence * dominance * arousal, family = binomial(link = "logit") )
 summary(VAD_mdl)
 plot_coefs(VAD_mdl) + labs(title = "Coefficients for Infering Authorship, sentiment") + theme_apa()
@@ -445,7 +481,11 @@ vad_coefs = vad_coefs[-1, ]
 vad_coefs$variable = rownames(vad_coefs)
 ggplot(data = vad_coefs,
        map = aes(y = OR, x = variable, fill = significance, color = significance)) + geom_bar(stat = 'identity') + 
-       labs(title = "Relative increase in odds of HC anderson being author per standard deviation increase in sentiment") + geom_hline(yintercept = 1, linetype = "dashed")
+       labs(title = "Relative increase in odds of HC anderson being author per standard deviation increase in sentiment") + geom_hline(yintercept = 1, linetype = "dashed") + theme_apa() 
+
+
+
+
 
 options(na.action = 'na.fail')
 dd = dredge(author_mdl, rank = "AICc")
@@ -466,3 +506,106 @@ ggplot(data = df_rvi,
 
 stargazer(author_mdl, author_mdl_2, author_mdl_3, author_mdl_4,title = "comparison of models", column.labels = c("Full Model",  "Without Fichtner's C", "Without Flesch Kincaid", "Best Model", "VAD Model"),  out = "glm_output.tex", type = "latex")
 
+
+
+# if there truly is a difference between the language used, then the language should be able to be used to predict if the author of a text is Andersen or the Grimm brothers.
+# predictive modelling
+
+library(caret)
+df_bind
+data = subset(df_bind, select = -c(Text, Types, Sentences, title, grm_D))
+head(data)
+data$author = as.factor(data$author)
+levels(data$author) = c("HC Andersen", "Grimm")
+
+
+set.seed(42)
+inTrain = createDataPartition(
+  y = data$author,
+  p = 0.75,
+  list = FALSE
+)
+training = data[inTrain, ]
+test = data[-inTrain,]
+
+
+###fullmod
+fullmod = train(
+  author ~.,
+  data = training,
+  method = "glm",
+  family = binomial()
+)
+summary(fullmod)
+
+
+fullmodpred_train = predict(fullmod, training)
+fullmodpred_test = predict(fullmod, test)
+
+cm_train = confusionMatrix(fullmodpred_train, training$author)
+print(cm_train) #acc = 0.92
+
+cm_test = confusionMatrix(fullmodpred_test, test$author)
+print(cm_test) # acc = 0.91
+
+
+#linguistic model
+
+ling = subset(data, select = -c(valence, arousal, dominance))
+  
+inTrain = createDataPartition(
+  y = ling$author,
+  p = 0.75,
+  list = FALSE
+)
+training = ling[inTrain, ]
+test = ling[-inTrain,]
+
+lingmod = train(
+  author ~.,
+  data = ling,
+  method = "glm",
+  family = binomial()
+)
+summary(lingmod) #aic = 141
+
+lingmodpred_train = predict(lingmod, training)
+lingmodpred_test = predict(lingmod, test)
+
+cm_train = confusionMatrix(lingmodpred_train, training$author)
+print(cm_train) #acc = 0.93
+
+cm_test = confusionMatrix(lingmodpred_test, test$author)
+print(cm_test) # acc = 0.89
+
+
+#vadmod
+vad = subset(data, select = c(author, valence, arousal, dominance))
+
+inTrain = createDataPartition(
+  y = vad$author,
+  p = 0.75,
+  list = FALSE
+)
+training = vad[inTrain, ]
+test = vad[-inTrain,]
+
+vadmod = train(
+  author ~ valence * arousal * dominance,
+  data = vad,
+  method = "glm",
+  family = binomial()
+)
+summary(vadmod) #aic = 415
+
+vadmodpred_train = predict(vadmod, training)
+vadmodpred_test = predict(vadmod, test)
+
+cm_train = confusionMatrix(vadmodpred_train, training$author)
+print(cm_train) #acc = 0.71
+
+cm_test = confusionMatrix(vadmodpred_test, test$author)
+print(cm_test) # acc = 0.70
+
+
+#### linguistic complexity is a better predictor of authorship than sentiment
