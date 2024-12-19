@@ -28,39 +28,53 @@ library(rgl)
 library(scatterplot3d)
 library(plotly)
 library(htmlwidgets)
+library(caret)
+
 
 inputpath = paste(getwd(), "/output", sep = "")
-df_hca = read.xlsx(paste(inputpath, "/hca_measures.xlsx", sep=""))
-df_grimm = read.xlsx(paste(inputpath, "/grimm_measures.xlsx", sep=""))
+df_hca = read.xlsx(paste(inputpath, "/hca_measures.xlsx", sep = ""))
+df_grimm = read.xlsx(paste(inputpath, "/grimm_measures.xlsx", sep = ""))
 df_bind = rbind(df_hca, df_grimm)
 
 #data frame to hold averages
-df_average = data.frame(row.names = c('Mean/Median*', 'mean/median*', 'p-value', "Cohen's D/Cliff's delta*"))
+df_average = data.frame(row.names = c(
+  'Mean/Median*',
+  'mean/median*',
+  'p-value',
+  "Cohen's D/Cliff's delta*"
+))
 df_average$author = c('HC Anderson', 'Grimm Brothers')
 df_average$author[3:4] = NA
 
 ### length of texts
-Desc(df_hca$Tokens, main='Descriptive plots of tokens in Andersen') #mean = 2743, 95CI = 2426 - 3056; median = 2023, skew = 0.95
-Desc(df_grimm$Tokens, main='Descriptive plots of tokens in Grimm')#mean = 1484 95CI = 1338 - 1630; median = 1261; skew = 0.82
+Desc(df_hca$Tokens, main = 'Descriptive plots of tokens in Andersen') #mean = 2743, 95CI = 2426 - 3056; median = 2023, skew = 0.95
+Desc(df_grimm$Tokens, main = 'Descriptive plots of tokens in Grimm')#mean = 1484 95CI = 1338 - 1630; median = 1261; skew = 0.82
 
 shapiro.test(df_hca$Tokens) #normality can be rejected
 shapiro.test(log(df_hca$Tokens)) #more normal, but rejectable on the .01 lvl -> parametric test required
 wilcox.test(df_hca$Tokens, df_grimm$Tokens) #p>0.001 -> Significant difference
-df_average$length = c(round(median(df_hca$Tokens), 2), round(median(df_grimm$Tokens),2), 'p<0.01', NA)
+CD = cliff.delta(df_hca$Tokens, df_grimm$Tokens)
+df_average$length = c(round(median(df_hca$Tokens), 2),
+                      round(median(df_grimm$Tokens), 2),
+                      'p<0.01',
+                      paste(round(CD$estimate, 3), 'Medium', sep = ', '))
 
-bar <- df_bind %>% group_by(author) %>% summarise(m = median(Tokens),
-                                       CI = MedianCI(Tokens)[3]-MedianCI(Tokens)[2])
-ggplot(bar, aes(author,m,fill=author)) + 
-  geom_bar(stat="identity", color="black", 
-           position=position_dodge()) +
-  geom_errorbar(aes(ymin=m-CI/2, ymax=m+CI/2), width=.2,
-                position=position_dodge(.9))+
-                  ylab('Average number of tokens per text')
+bar <-
+  df_bind %>% group_by(author) %>% summarise(m = median(Tokens),
+                                             CI = MedianCI(Tokens)[3] - MedianCI(Tokens)[2])
+ggplot(bar, aes(author, m, fill = author)) +
+  geom_bar(stat = "identity",
+           color = "black",
+           position = position_dodge()) +
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = .2,
+                position = position_dodge(.9)) +
+  ylab('Average number of tokens per text')
 
 ### Readability
 
-Desc(df_hca$flesch_kincaid, main='Descriptive plots of Flesch-Kincaid score in Andersen')
-Desc(df_grimm$flesch_kincaid, main='Descriptive plots of Flesch_Kincaid in Grimm')
+Desc(df_hca$flesch_kincaid, main = 'Descriptive plots of Flesch-Kincaid score in Andersen')
+Desc(df_grimm$flesch_kincaid, main = 'Descriptive plots of Flesch_Kincaid in Grimm')
 
 shapiro.test(df_hca$flesch_kincaid) # normality can't be rejected, and visual inspection suggests normality
 shapiro.test(df_grimm$flesch_kincaid) # normality can be rejected at alpha = 0.01, but visual inspection looks okay
@@ -68,23 +82,32 @@ shapiro.test(df_grimm$flesch_kincaid) # normality can be rejected at alpha = 0.0
 t.test(df_hca$flesch_kincaid, df_grimm$flesch_kincaid)# p<0.001
 CD = CohenD(df_hca$flesch_kincaid, df_grimm$flesch_kincaid)
 
-df_average$flesch_kincaid = c(round(mean(df_hca$flesch_kincaid), 3), round(mean(df_grimm$flesch_kincaid),3), 'p<0.001', paste(round(CD,3), 'Medium', sep = ', '))
+df_average$flesch_kincaid = c(round(mean(df_hca$flesch_kincaid), 3),
+                              round(mean(df_grimm$flesch_kincaid), 3),
+                              'p<0.001',
+                              paste(round(CD, 3), 'Medium', sep = ', '))
 
 
-bar <- df_bind %>% group_by(author) %>% summarise(m = mean(flesch_kincaid),
-                                                  CI = MeanCI(flesch_kincaid)[3]-MeanCI(flesch_kincaid)[2])
+bar <-
+  df_bind %>% group_by(author) %>% summarise(
+    m = mean(flesch_kincaid),
+    CI = MeanCI(flesch_kincaid)[3] -
+      MeanCI(flesch_kincaid)[2]
+  )
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Average Flesch-Kincaid Score (mean)')
 
 
 ### Lexical diversity
 
-Desc(df_hca$MSTTR, main='Descriptive plots of mean segment type token ratio in Andersen')
-Desc(df_grimm$MSTTR, main='Descriptive plots of mean segment type token ratio in Grimm')
+Desc(df_hca$MSTTR, main = 'Descriptive plots of mean segment type token ratio in Andersen')
+Desc(df_grimm$MSTTR, main = 'Descriptive plots of mean segment type token ratio in Grimm')
 
 shapiro.test(df_hca$MSTTR) # normality can be rejected, but visual inspection looks fairly okay
 shapiro.test(df_grimm$MSTTR) # normality can be rejected at alpha = 0.99, but visual inspection looks okay
@@ -93,15 +116,21 @@ shapiro.test(df_grimm$MSTTR) # normality can be rejected at alpha = 0.99, but vi
 t.test(df_hca$MSTTR, df_grimm$MSTTR) #p<0.001
 CD = CohenD(df_hca$MSTTR, df_grimm$MSTTR)
 
-df_average$MSTTR = c(round(mean(df_hca$MSTTR), 3), round(mean(df_grimm$MSTTR),3), 'p<0.001', paste(round(CD, 3), 'Medium', sep = ', '))
+df_average$MSTTR = c(round(mean(df_hca$MSTTR), 3),
+                     round(mean(df_grimm$MSTTR), 3),
+                     'p<0.001',
+                     paste(round(CD, 3), 'Medium', sep = ', '))
 
 
 bar <- df_bind %>% group_by(author) %>% summarise(m = mean(MSTTR),
-                                                  CI = MeanCI(MSTTR)[3]-MeanCI(MSTTR)[2])
+                                                  CI = MeanCI(MSTTR)[3] -
+                                                    MeanCI(MSTTR)[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Average Mean Segment Type Token Ratio (mean(')
 
@@ -109,8 +138,8 @@ ggplot(bar, aes(author, m, fill = author)) +
 
 
 ### Hapax - richness of text
-Desc(df_hca$hapax, main='Descriptive plots of mean hapax legomenon in Andersen')
-Desc(df_grimm$hapax, main='Descriptive plots of mean segment type token ratio in Grimm')
+Desc(df_hca$hapax, main = 'Descriptive plots of mean hapax legomenon in Andersen')
+Desc(df_grimm$hapax, main = 'Descriptive plots of mean segment type token ratio in Grimm')
 
 shapiro.test(df_hca$hapax) # normality can't be rejected, but looks visually good
 shapiro.test(df_grimm$hapax) # normality can't be rejected, but looks visually good
@@ -119,15 +148,21 @@ shapiro.test(df_grimm$hapax) # normality can't be rejected, but looks visually g
 t.test(df_hca$hapax, df_grimm$hapax) #p>0.01
 CD = CohenD(df_hca$hapax, df_grimm$hapax)
 
-df_average$hapax = c(round(mean(df_hca$hapax), 3), round(mean(df_grimm$hapax),3), 'p<0.01', paste(round(CD, 3), 'Small', sep = ', '))
+df_average$hapax = c(round(mean(df_hca$hapax), 3),
+                     round(mean(df_grimm$hapax), 3),
+                     'p<0.01',
+                     paste(round(CD, 3), 'Small', sep = ', '))
 
 
 bar <- df_bind %>% group_by(author) %>% summarise(m = mean(hapax),
-                                                  CI = MeanCI(hapax)[3]-MeanCI(hapax)[2])
+                                                  CI = MeanCI(hapax)[3] -
+                                                    MeanCI(hapax)[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Average percent of hapax legomenon (mean)')
 
@@ -143,14 +178,20 @@ shapiro.test(df_grimm$lex_D) #normality can be rejected, but looks cisually okay
 t.test(df_hca$lex_D, df_grimm$lex_D) # p < 0.001
 CD = CohenD(df_hca$lex_D, df_grimm$lex_D) #small effect
 
-df_average$lex_D = c(round(mean(df_hca$lex_D), 3), round(mean(df_grimm$lex_D),3), 'p<0.001', paste(round(CD, 3), 'Small', sep = ', '))
+df_average$lex_D = c(round(mean(df_hca$lex_D), 3),
+                     round(mean(df_grimm$lex_D), 3),
+                     'p<0.001',
+                     paste(round(CD, 3), 'Small', sep = ', '))
 
 bar <- df_bind %>% group_by(author) %>% summarise(m = mean(lex_D),
-                                                  CI = MeanCI(lex_D)[3]-MeanCI(lex_D)[2])
+                                                  CI = MeanCI(lex_D)[3] -
+                                                    MeanCI(lex_D)[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Average lexical Density (mean)')
 
@@ -167,20 +208,27 @@ Desc(log(df_hca$ficht_c)) # log transform -> normality can't be rejected
 Desc(log(df_grimm$ficht_c)) # log transform -> normality can be rejected
 
 shapiro.test(log(df_hca$ficht_c)) #normality can't be rejected
-shapiro.test(log(df_grimm$ficht_c)) # normality can be rejected 
+shapiro.test(log(df_grimm$ficht_c)) # normality can be rejected
 
 #parametric test
 wilcox.test(log(df_grimm$ficht_c), log(df_hca$ficht_c)) # significant at p<0.001
 cd = cliff.delta(log(df_hca$ficht_c), log(df_grimm$ficht_c))
 
-df_average$log_ficht_c = c(round(median(log(df_hca$ficht_c)), 3), round(median(log(df_grimm$ficht)),3), 'p<0.001', paste(round(cd$estimate, 3), 'Small', sep = ', '))
+df_average$log_ficht_c = c(round(median(log(df_hca$ficht_c)), 3),
+                           round(median(log(df_grimm$ficht)), 3),
+                           'p<0.001',
+                           paste(round(cd$estimate, 3), 'Small', sep = ', '))
 
-bar <- df_bind %>% group_by(author) %>% summarise(m = median(log(ficht_c)),
-                                                  CI = MedianCI(log(ficht_c))[3]-MedianCI(log(ficht_c))[2])
+bar <-
+  df_bind %>% group_by(author) %>% summarise(m = median(log(ficht_c)),
+                                             CI = MedianCI(log(ficht_c))[3] -
+                                               MedianCI(log(ficht_c))[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Syntactic complexity as the average logarithm of Ficht C (median)')
 
@@ -197,14 +245,20 @@ t.test(df_hca$valence, df_grimm$valence) # p<0.001
 
 CD = CohenD(df_hca$valence, df_grimm$valence) #large effect
 
-df_average$valence = c(round(mean(df_hca$valence), 3), round(mean(df_grimm$valence),3), 'p<0.001', paste(round(CD, 3), 'Large', sep = ', '))
+df_average$valence = c(round(mean(df_hca$valence), 3),
+                       round(mean(df_grimm$valence), 3),
+                       'p<0.001',
+                       paste(round(CD, 3), 'Large', sep = ', '))
 
 bar <- df_bind %>% group_by(author) %>% summarise(m = mean(valence),
-                                                  CI = MeanCI(valence)[3]-MeanCI(valence)[2])
+                                                  CI = MeanCI(valence)[3] -
+                                                    MeanCI(valence)[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Mean valence score')
 
@@ -222,14 +276,20 @@ t.test(df_hca$arousal, df_grimm$arousal) #p<0.001
 #Effectsize cliffs delta
 cd = CohenD(df_hca$arousal, df_grimm$arousal)#small effect
 
-df_average$arousal = c(round(mean(df_hca$arousal), 3), round(mean(df_grimm$arousal),3), 'p<0.001', paste(round(cd, 3), 'small', sep = ', '))
+df_average$arousal = c(round(mean(df_hca$arousal), 3),
+                       round(mean(df_grimm$arousal), 3),
+                       'p<0.001',
+                       paste(round(cd, 3), 'small', sep = ', '))
 
 bar <- df_bind %>% group_by(author) %>% summarise(m = mean(arousal),
-                                                  CI = MeanCI(arousal)[3]-MeanCI(arousal)[2])
+                                                  CI = MeanCI(arousal)[3] -
+                                                    MeanCI(arousal)[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('average arousal score (median)')
 
@@ -245,19 +305,31 @@ t.test(df_hca$dominance, df_grimm$dominance) #p<0.05
 #Effectsize cliffs delta
 cd = CohenD(df_hca$dominance, df_grimm$dominance)#small effect
 
-df_average$dominance = c(round(mean(df_hca$dominance), 3), round(mean(df_grimm$dominance),3), 'p<0.05', paste(round(cd, 3), '  Small', sep = ', '))
+df_average$dominance = c(round(mean(df_hca$dominance), 3),
+                         round(mean(df_grimm$dominance), 3),
+                         'p<0.05',
+                         paste(round(cd, 3), '  Small', sep = ', '))
 
-bar <- df_bind %>% group_by(author) %>% summarise(m = mean(dominance),
-                                                  CI = MeanCI(dominance)[3]-MeanCI(dominance)[2])
+bar <-
+  df_bind %>% group_by(author) %>% summarise(m = mean(dominance),
+                                             CI = MeanCI(dominance)[3] -
+                                               MeanCI(dominance)[2])
 ggplot(bar, aes(author, m, fill = author)) +
-  geom_bar(stat = "identity", color = "black", 
+  geom_bar(stat = "identity",
+           color = "black",
            position = position_dodge()) +
-  geom_errorbar(aes(ymin = m - CI/2, ymax = m + CI/2), width = 0.2,
+  geom_errorbar(aes(ymin = m - CI / 2, ymax = m + CI / 2),
+                width = 0.2,
                 position = position_dodge(0.9)) +
   ylab('Median dominance score')
 
 outputpath = paste(getwd(), "/output", sep = "")
-write.csv(df_average, paste(outputpath, '/average_measures_combined.csv', sep = ""), row.names = TRUE, quote = TRUE)
+write.csv(
+  df_average,
+  paste(outputpath, '/average_measures_combined.csv', sep = ""),
+  row.names = TRUE,
+  quote = TRUE
+)
 
 
 
@@ -265,66 +337,194 @@ write.csv(df_average, paste(outputpath, '/average_measures_combined.csv', sep = 
 #create a table
 df_average = df_average %>%
   rownames_to_column(var = " ")
-colnames(df_average) = c(" ", "Author", "Length*", "Flesch-Kincaid", "MSTTR", "Hapax", "Lexical Density", "Ficht C (log)*", "Valence", "Arousal", "Dominance" )
+colnames(df_average) = c(
+  " ",
+  "Author",
+  "Length*",
+  "Flesch-Kincaid",
+  "MSTTR",
+  "Hapax",
+  "Lexical Density",
+  "Ficht C (log)*",
+  "Valence",
+  "Arousal",
+  "Dominance"
+)
 
 gt(df_average) %>%
   tab_header(title = "Average Scores Table") %>%
-  tab_style(
-    style = list(
-      cell_fill(color = "lightblue"),
-      cell_text(weight = "bold")
-    ),
-    locations = cells_column_labels()
-  )
+  tab_style(style = list(cell_fill(color = "lightblue"),
+                         cell_text(weight = "bold")),
+            locations = cells_column_labels())
 
 avrgs = df_bind %>% group_by(author) %>% summarise(
-  length = median(Tokens)/10000,
-  flesch_kincaid = median(flesch_kincaid)/10, 
+  length = median(Tokens) / 10000,
+  flesch_kincaid = median(flesch_kincaid) / 10,
   MSTTR = median(MSTTR),
-  hapax = median(hapax)/100,
+  hapax = median(hapax) / 100,
   lex_D = median(lex_D),
-  ficht_c = median(ficht_c)/100,
+  ficht_c = median(ficht_c) / 100,
   valence = median(valence),
   arousal = median(arousal),
   dominance = median(dominance)
 )
 
 # barplots
-avrg_longer = avrgs %>% pivot_longer(cols = c('length','flesch_kincaid', 'MSTTR', 'hapax', 'lex_D','ficht_c', 'valence', 'arousal', 'dominance'), names_to = "measure", values_to = 'averages') 
-avrg_longer$measure = factor(avrg_longer$measure, levels = c('length','flesch_kincaid', 'MSTTR', 'hapax', 'lex_D','ficht_c', 'valence', 'arousal', 'dominance'))
+avrg_longer = avrgs %>% pivot_longer(
+  cols = c(
+    'length',
+    'flesch_kincaid',
+    'MSTTR',
+    'hapax',
+    'lex_D',
+    'ficht_c',
+    'valence',
+    'arousal',
+    'dominance'
+  ),
+  names_to = "measure",
+  values_to = 'averages'
+)
+avrg_longer$measure = factor(
+  avrg_longer$measure,
+  levels = c(
+    'length',
+    'flesch_kincaid',
+    'MSTTR',
+    'hapax',
+    'lex_D',
+    'ficht_c',
+    'valence',
+    'arousal',
+    'dominance'
+  )
+)
 
 avrg_plot = ggplot(data = avrg_longer,
-                   map = aes(y = averages,x = measure, fill = author, color = author)) + geom_bar(position = 'dodge', stat = 'identity')
-avrg_plot + labs(title = 'Comparison of average measurements between authors rescaled', y = 'averages', x = 'measures') + scale_x_discrete(labels = c('Length', 'Flesch Kincaid','MSTTR' ,'Hapax', 'Lexical Density',"Fichtner's C", 'Valence', 'Arousal', 'Dominance')) + theme_apa()
+                   map = aes(
+                     y = averages,
+                     x = measure,
+                     fill = author,
+                     color = author
+                   )) + geom_bar(position = 'dodge', stat = 'identity')
 
+avrg_plot + labs(title = 'Comparison of average measurements between authors rescaled', y = 'averages', x = 'measures') + scale_x_discrete(
+  labels = c(
+    'Length',
+    'Flesch Kincaid',
+    'MSTTR' ,
+    'Hapax',
+    'Lexical Density',
+    "Fichtner's C",
+    'Valence',
+    'Arousal',
+    'Dominance'
+  )
+) + theme_apa()
+
+
+#CI plot
+cd_tokens = cohen.d(df_hca$Tokens, df_grimm$Tokens)
+cd_flesh = cohen.d(df_hca$flesch_kincaid, df_grimm$flesch_kincaid)
+cd_msttr = cohen.d(df_hca$MSTTR, df_grimm$MSTTR)
+cd_hapax = cohen.d(df_hca$hapax, df_grimm$hapax)
+cd_lex_d = cohen.d(df_hca$lex_D, df_grimm$lex_D)
+cd_ficht = cohen.d(df_hca$ficht_c, df_grimm$ficht_c)
+cd_val = cohen.d(df_hca$valence, df_grimm$valence)
+cd_aro = cohen.d(df_hca$arousal, df_grimm$arousal)
+cd_dom = cohen.d(df_hca$dominance, df_grimm$dominance)
+cd = rbind(cd_tokens, cd_flesh, cd_msttr, cd_hapax, cd_lex_d, cd_ficht, cd_val, cd_aro, cd_dom)
+
+
+est = c(cd_tokens$estimate,cd_flesh$estimate,cd_msttr$estimate,cd_hapax$estimate,cd_lex_d$estimate,cd_ficht$estimate,cd_val$estimate,cd_aro$estimate,cd_dom$estimate)
+lci = c(cd_tokens$conf.int[1],cd_flesh$conf.int[1],cd_msttr$conf.int[1],cd_hapax$conf.int[1],cd_lex_d$conf.int[1],cd_ficht$conf.int[1],cd_val$conf.int[1],cd_aro$conf.int[1],cd_dom$conf.int[1])
+uci = c(cd_tokens$conf.int[2],cd_flesh$conf.int[2],cd_msttr$conf.int[2],cd_hapax$conf.int[2],cd_lex_d$conf.int[2],cd_ficht$conf.int[2],cd_val$conf.int[2],cd_aro$conf.int[2],cd_dom$conf.int[2])
+
+plot_data = data.frame(est, lci, uci)
+plot_data$names = c("Length", "Flesch Kincaid", "MSTTR", "Hapax", "Lexical Density", "Fichtner's C", "Valence", "Arousal", "Dominance")
+head(plot_data)
+
+
+ggplot(data = plot_data, aes(y = est, x = names, fill = names)) + 
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = lci, ymax = uci), width = 0.2) + theme(legend.position = "none") +
+  geom_hline(yintercept = 0, color = "black") + 
+  scale_x_discrete(limits = c("Length", "Flesch Kincaid", "MSTTR", "Hapax", "Lexical Density", "Fichtner's C", "Valence", "Arousal", "Dominance")) +
+  labs(y = "Cohen's D", x = "variables", title = "Effect Size plot for NHST with 95% Confidence Intervalls") +
+  theme(legend.position = "none")
 
 #boxplots
-sent_long = df_bind %>% pivot_longer(cols = c('valence', 'arousal', 'dominance'), names_to = 'sent_measures', values_to = 'sent_values')
-sent_long$sent_measures = factor(sent_long$sent_measures, levels = c('valence','arousal', 'dominance'))
+sent_long = df_bind %>% pivot_longer(
+  cols = c('valence', 'arousal', 'dominance'),
+  names_to = 'sent_measures',
+  values_to = 'sent_values'
+)
+sent_long$sent_measures = factor(sent_long$sent_measures,
+                                 levels = c('valence', 'arousal', 'dominance'))
 
-sent_box = ggplot(data = sent_long,
-                  map = aes(x = sent_measures, 
-                            y = sent_values, fill = author, color = author)) + geom_boxplot(position = 'dodge', color = 'black')
+sent_box = ggplot(
+  data = sent_long,
+  map = aes(
+    x = sent_measures,
+    y = sent_values,
+    fill = author,
+    color = author
+  )
+) + geom_boxplot(position = 'dodge', color = 'black')
 sent_box + labs(title = 'Comparison of Distribution of Sentiment Values by Author', y = 'Sentiment Values', x = 'Sentiment Measurements') + theme_apa()
 
 num_cols = sapply(df_bind, is.numeric)
 df_nums = subset(df_bind, select = num_cols)
 df_nums = subset(df_nums, select = -c(Types, Sentences, grm_D))
-test = scale(df_nums$valence)[,1]
+test = scale(df_nums$valence)[, 1]
 
-for (i in 1:length(colnames(df_nums))){
-  df_nums[,i] = scale(df_nums[,i])[,1]
+for (i in 1:length(colnames(df_nums))) {
+  df_nums[, i] = scale(df_nums[, i])[, 1]
 }
 
 cols_to_pivot = colnames(df_nums)
 df_nums$author = df_bind$author
 
-nums_long = df_nums %>% pivot_longer(cols = all_of(cols_to_pivot), names_to = "measures", values_to = "values")
-nums_long$measures = factor(nums_long$measures, level = c("Tokens", "flesch_kincaid","MSTTR", "hapax","lex_D", "ficht_c", "valence", "arousal", "dominance"))
+nums_long = df_nums %>% pivot_longer(
+  cols = all_of(cols_to_pivot),
+  names_to = "measures",
+  values_to = "values"
+)
+nums_long$measures = factor(
+  nums_long$measures,
+  level = c(
+    "Tokens",
+    "flesch_kincaid",
+    "MSTTR",
+    "hapax",
+    "lex_D",
+    "ficht_c",
+    "valence",
+    "arousal",
+    "dominance"
+  )
+)
 
 nums_box = ggplot(data = nums_long,
-                  map = aes(x = measures, y = values, fill = author, color = author)) + geom_boxplot(position = 'dodge', color = "black")
-nums_box + labs(title = 'Distribution of z-transformed Measures by Author as Boxplots', y = 'Values', x = 'Measures') + scale_x_discrete(labels = c('Length', 'Flesch Kincaid','MSTTR' ,'Hapax', 'Lexical Density',"Fichtner's C", 'Valence', 'Arousal', 'Dominance')) + theme_apa()
+                  map = aes(
+                    x = measures,
+                    y = values,
+                    fill = author,
+                    color = author
+                  )) + geom_boxplot(position = 'dodge', color = "black")
+nums_box + labs(title = 'Distribution of z-transformed Measures by Author as Boxplots', y = 'Values', x = 'Measures') + scale_x_discrete(
+  labels = c(
+    'Length',
+    'Flesch Kincaid',
+    'MSTTR' ,
+    'Hapax',
+    'Lexical Density',
+    "Fichtner's C",
+    'Valence',
+    'Arousal',
+    'Dominance'
+  )
+) + theme_apa()
 
 nums_box
 #heavy outlier in grimm MSTTR -> domestic servant ,  repeats the sentences over and over
@@ -354,7 +554,14 @@ fig = plot_ly(df_plot,
                       "<br>Arousal:", round(arousal,3), 
                       "<br>Dominance:", round(dominance,3), 
                       "<br>Author:", author, 
-                      "<br>Title:", df_plot$title),  # Custom hover text
+                      "<br>Title:", df_plot$title,
+                      "<br>Length", Tokens,
+                      "<br>Flesch Kincaid", round(flesch_kincaid,3),
+                      "<br>MSTTR", round(MSTTR,3),
+                      "<br>Hapax", round(hapax,3),
+                      "<br>Lexical Density", round(lex_D,3),
+                      "<br>Fichtner's C", round(ficht_c,3)
+                      ),  # Custom hover text
         customdata = df_plot$text,
         hoverinfo = "text")  # Display hover text only
 
@@ -402,18 +609,19 @@ fig <- fig %>% htmlwidgets::onRender("
 
 saveWidget(fig, "3d_scatterplot.html", selfcontained = TRUE)
 
+data = df_bind
+View(data)
 
 
-#### modelling
+#### modelling#### 
 #inferential modelling
 
 model = subset(df_bind, select = -c(Text, title, Types, Sentences, grm_D))
 
 
 model$author = as.factor(model$author)
-levels(model$author) = c("HC Andersen", "Grimm")
+levels(model$author) = c("Grimm", "HC Andersen")
 colnames(model)[1] = "length"
-model = model %>% 
 attach(model)
 
 nums_cols = sapply(model, is.numeric)
@@ -450,8 +658,7 @@ VIF(author_mdl_3)
 #adding interaction terms for sentiment
 author_mdl_4 = glm(data = z_model_3, author ~ . + arousal:dominance + valence:dominance + valence:arousal, family = binomial(link = "logit") )
 summary(author_mdl_4) #285.91
-plot_coefs(author_mdl_4) + labs(title = "Coefficients for Infering Authorship, Best model") + 
-  scale_y_discrete(labels = c('Length','MSTTR' ,'Hapax', 'Lexical Density',"Fichtner's C", 'Valence', 'Arousal', 'Dominance', 'Arousal:Dominance', 'Valence:Dominance', 'Valence:Arousal')) + 
+plot_coefs(author_mdl_4) + labs(title = "Coefficients for Infering Authorship, Best model") +
                      theme_apa()
 
 
@@ -511,7 +718,7 @@ stargazer(author_mdl, author_mdl_2, author_mdl_3, author_mdl_4,title = "comparis
 # if there truly is a difference between the language used, then the language should be able to be used to predict if the author of a text is Andersen or the Grimm brothers.
 # predictive modelling
 
-library(caret)
+
 df_bind
 data = subset(df_bind, select = -c(Text, Types, Sentences, title, grm_D))
 head(data)
@@ -536,6 +743,7 @@ fullmod = train(
   method = "glm",
   family = binomial()
 )
+
 summary(fullmod)
 
 
@@ -609,3 +817,29 @@ print(cm_test) # acc = 0.70
 
 
 #### linguistic complexity is a better predictor of authorship than sentiment
+data = df_bind
+data$author = as.factor(data$author)
+levels(data$author) = c("Grimm", "HC Andersen")
+
+
+mdl = glm(data = data, author ~ valence + flesch_kincaid, family = binomial(link = "logit"))
+summary(mdl)
+
+grid = expand.grid(
+  flesch_kincaid = seq(min(data$flesch_kincaid), max(data$flesch_kincaid), length = 100),
+  valence = seq(min(data$valence), max(data$valence), length = 100)
+)
+
+grid$prob = predict(mdl, newdata = grid, type = "response")
+
+ggplot(data, aes(y = flesch_kincaid, x = valence, color = author)) +
+  geom_point() +
+  stat_contour(data = grid, aes(z = prob), breaks = 0.5, color = "black") +
+  labs(title = "Scatterplot with Decision Boundary",
+       x = "valence",
+       y = "Flesch Kincaid") +
+  theme_apa()
+
+
+ggplot(data = data, aes(y = dominance, x = valence, color = author)) + 
+  geom_point()
