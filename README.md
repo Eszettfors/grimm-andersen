@@ -4,4 +4,4 @@ The repository consists of two python scripts used to gather the stories of HC a
 The R-script 'Measurements' creates a corpora for both authors and generates linguistic complexity measures as well as tags its lexicon with sentiments, exporting the results to the output folder.
 In Analysis.R this data is then analyzed by means of NHST and a generalized linear model. 
 
-A interactive 3d scatterplot is deployed, visualizing the sentiment model, with sentiment values for all stories and the texts of the stories.
+An interactive 3d scatterplot is deployed, visualizing the sentiment model, with sentiment values for all stories and the texts of the stories.
